@@ -87,6 +87,37 @@ __global__ void reduce_v4(const float* in, float* out, int n) {
     if (tid == 0) out[blockIdx.x] = s[0];
 }
 
+__device__ float warp_reduce_sum(float val){
+    for(int offset = 16;offset>0;offset /= 2){
+        val += __shfl_down_sync(0xffffffff, val, offset);
+    }
+    return val;
+}
+
+__global__ void reduce_v5(const float* in, float* out, int n){
+    __shared__ float warpsum[8];
+    int tid = threadIdx.x;
+    int lane = tid % 32;
+    int warp = tid /32;
+
+    float sum = 0.0f;
+    for (int i = blockIdx.x * blockDim.x + tid; i < n; i += blockDim.x * gridDim.x) {
+        sum += in[i];
+    }
+
+    sum = warp_reduce_sum(sum);
+    if(lane == 0){
+        warpsum[warp] = sum;
+    }
+    __syncthreads(); 
+    if(warp == 0){
+        sum = (lane < 8) ? warpsum[lane] : 0.0f;
+        sum = warp_reduce_sum(sum);
+        if(lane == 0){
+            out[blockIdx.x] = sum;
+        }
+    }
+}
 
 
 int launch(int v, const float* d_in, float* d_out, int n,int threads) {
@@ -97,6 +128,8 @@ int launch(int v, const float* d_in, float* d_out, int n,int threads) {
         case 3: reduce_v3<<<blocks, threads>>>(d_in, d_out, n); return blocks;
         case 4: blocks = 1024;                        
                 reduce_v4<<<blocks, threads>>>(d_in, d_out, n); return blocks;
+        case 5: blocks = 1024;                        
+                reduce_v5<<<blocks, threads>>>(d_in, d_out, n); return blocks;
         default: std::cout << "Unknown version " << v << std::endl; exit(1);
     }
 }
@@ -124,7 +157,7 @@ int main() {
     CUDA_CHECK(cudaEventCreate(&start));
     CUDA_CHECK(cudaEventCreate(&stop));
 
-    for (int v = 1; v <= 4; v++) {                                       
+    for (int v = 1; v <= 5; v++) {                                       
         
         CUDA_CHECK(cudaMemset(d_out, 0, BLOCKS * sizeof(float)));         
         int used = launch(v, d_in, d_out, N,THREADS);
