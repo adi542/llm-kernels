@@ -61,11 +61,42 @@ __global__ void reduce_v3(const float* in, float* out, int n) {
 }
 
 
-void launch(int v, const float* d_in, float* d_out, int n, int blocks, int threads) {
+
+__global__ void reduce_v4(const float* in, float* out, int n) {
+    __shared__ float s[256];
+    int tid = threadIdx.x;
+
+    // step 1: each thread sums many numbers by itself (coalesced, no barriers)
+    float sum = 0.0f;
+    for (int i = blockIdx.x * blockDim.x + tid; i < n; i += blockDim.x * gridDim.x) {
+        sum += in[i];
+    }
+
+    // step 2: put the thread's sum in shared memory
+    s[tid] = sum;
+    __syncthreads();
+
+    // step 3: the same tree as v3
+    for (int stride = blockDim.x / 2; stride > 0; stride /= 2) {
+        if (tid < stride) {
+            s[tid] += s[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0) out[blockIdx.x] = s[0];
+}
+
+
+
+int launch(int v, const float* d_in, float* d_out, int n,int threads) {
+    int blocks = (n + threads - 1) / threads; 
     switch (v) {
-        case 1: reduce_v1<<<blocks, threads>>>(d_in, d_out, n); break;
-        case 2: reduce_v2<<<blocks, threads>>>(d_in, d_out, n); break;
-        case 3: reduce_v3<<<blocks, threads>>>(d_in, d_out, n); break;
+        case 1: reduce_v1<<<blocks, threads>>>(d_in, d_out, n); return blocks;
+        case 2: reduce_v2<<<blocks, threads>>>(d_in, d_out, n); return blocks;
+        case 3: reduce_v3<<<blocks, threads>>>(d_in, d_out, n); return blocks;
+        case 4: blocks = 1024;                        
+                reduce_v4<<<blocks, threads>>>(d_in, d_out, n); return blocks;
         default: std::cout << "Unknown version " << v << std::endl; exit(1);
     }
 }
@@ -93,22 +124,22 @@ int main() {
     CUDA_CHECK(cudaEventCreate(&start));
     CUDA_CHECK(cudaEventCreate(&stop));
 
-    for (int v = 1; v <= 3; v++) {                                       
+    for (int v = 1; v <= 4; v++) {                                       
         
         CUDA_CHECK(cudaMemset(d_out, 0, BLOCKS * sizeof(float)));         
-        launch(v, d_in, d_out, N, BLOCKS, THREADS);
+        int used = launch(v, d_in, d_out, N,THREADS);
         CUDA_CHECK(cudaGetLastError());
         CUDA_CHECK(cudaDeviceSynchronize());
 
-        CUDA_CHECK(cudaMemcpy(h_out, d_out, BLOCKS * sizeof(float), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(h_out, d_out, used * sizeof(float), cudaMemcpyDeviceToHost));
         double gpu = 0.0;
-        for (int b = 0; b < BLOCKS; b++) gpu += h_out[b];
+        for (int b = 0; b < used; b++) gpu += h_out[b];
         double rel_err = fabs(gpu - ref) / fabs(ref);
 
         
         int runs = 20;
         CUDA_CHECK(cudaEventRecord(start));
-        for (int r = 0; r < runs; r++) launch(v, d_in, d_out, N, BLOCKS, THREADS);
+        for (int r = 0; r < runs; r++) launch(v, d_in, d_out, N,THREADS);
         CUDA_CHECK(cudaEventRecord(stop));
         CUDA_CHECK(cudaEventSynchronize(stop));
         CUDA_CHECK(cudaGetLastError());
