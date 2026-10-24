@@ -37,6 +37,45 @@ void softmax_cpu(const float* x, float* y, int rows, int cols) {
     }
 }
 
+__global__ void softmax_v2(const float* x, float* y, int rows, int cols){
+    __shared__ float s[256];
+    int row = blockIdx.x;                   
+    int tid = threadIdx.x;
+
+    const float* xr = x + (size_t)row * cols;
+    float*       yr = y + (size_t)row * cols;
+    float m = -INFINITY;
+    for(int j = tid;j<cols;j += blockDim.x){
+        m = fmaxf(m,xr[j]);
+    }
+    s[tid] = m;
+   __syncthreads();
+    for(int stride = blockDim.x/2;stride> 0;stride /= 2){
+        if(tid < stride){
+            s[tid] = fmaxf(s[tid],s[tid + stride]);
+        }
+        __syncthreads();
+    }
+    m = s[0];
+    __syncthreads();
+
+    float sum = 0.0f;
+    for (int j = tid; j < cols; j += blockDim.x) sum += expf(xr[j] - m);
+    s[tid] = sum;
+    __syncthreads();
+    for (int stride = blockDim.x / 2; stride > 0; stride /= 2) {
+        if (tid < stride) s[tid] += s[tid + stride];
+        __syncthreads();
+    }
+    sum = s[0];     
+
+    for(int j = tid;j<cols;j+=blockDim.x){
+        yr[j] = expf(xr[j] - m) / sum;
+    }
+    
+
+}
+
 void launch(int v,const float* d_x,float* d_y,int rows,int cols){
     switch(v){
         case 1: {
@@ -45,6 +84,10 @@ void launch(int v,const float* d_x,float* d_y,int rows,int cols){
             softmax_v1<<<blocks, threads>>>(d_x, d_y, rows, cols);
             break;
            }
+        case 2: {
+            softmax_v2<<<rows, 256>>>(d_x, d_y, rows, cols);
+            break;
+        }
        default: std::cout << "Unknown version " << v << std::endl; exit(1);
     }
 }
@@ -68,7 +111,7 @@ int main(){
     CUDA_CHECK(cudaEventCreate(&start));
     CUDA_CHECK(cudaEventCreate(&stop));
 
-    for (int v = 1; v <= 1; v++) {
+    for (int v = 1; v <= 2; v++) {
         CUDA_CHECK(cudaMemset(d_y, 0, bytes));
         launch(v, d_x, d_y, ROWS, COLS);
         CUDA_CHECK(cudaGetLastError());
