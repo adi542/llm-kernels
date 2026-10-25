@@ -6,3 +6,4 @@ Reduction v5 (warp shuffles, 1 barrier/block): 221.1 GB/s, ~3% over v4. Tree was
 Softmax v1 (one thread per row, 3 passes): 4096x1024, 1.72 ms, 19.5 GB/s effective (6% of 320). Uncoalesced, too few threads, reads input 3x.
 Softmax v2 (one block per row, shared memory trees): 0.256 ms, 131.0 GB/s (41%). 6.7x v1: coalesced, all SMs busy.
 Softmax v3 (warp shuffles, 4 barriers/row instead of ~18): 0.195 ms, 172.0 GB/s (54%). +29% over v2: trees matter with short rows.
+Softmax v4 (online softmax, 2 passes): 146.7 GB/s vs v3 175.7 in the same run. Slower standalone: rows fit in cache so the saved pass was cheap, and the update adds 2 exps + a dependency chain per element. Its value is enabling fusion (Flash Attention). Also fixed the checker: NaN used to pass as 'correct'.

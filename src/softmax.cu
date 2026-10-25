@@ -146,6 +146,62 @@ __global__ void softmax_v3(const float* x, float* y, int rows, int cols) {
     for (int j = tid; j < cols; j += blockDim.x) yr[j] = expf(xr[j] - m) / sum;
 }
 
+__device__ void merge_md(float& m, float& d, float m_other, float d_other){
+    float m_new = fmaxf(m,m_other);
+    if (m_new == -INFINITY) return; 
+    d = d * expf(m - m_new) + d_other * expf(m_other - m_new);
+    m = m_new;
+}
+
+__device__ void warp_reduce_md(float& m,float& d){
+    for(int offset = 16;offset > 0;offset /= 2){
+        float m_other = __shfl_down_sync(0xffffffff, m, offset);
+        float d_other = __shfl_down_sync(0xffffffff, d, offset);
+        merge_md(m, d, m_other, d_other);
+    }
+    
+}
+
+__global__ void softmax_v4(const float* x, float* y, int rows, int cols){
+    __shared__ float sm[32];
+    __shared__ float sd[32];
+    int row = blockIdx.x;
+    int tid = threadIdx.x;
+    int lane = tid % 32;
+    int warp = tid / 32;
+    const float* xr = x + (size_t)row * cols;
+    float*       yr = y + (size_t)row * cols;
+    float m = -INFINITY;
+    float d = 0.0f;
+    for(int j = tid;j<cols;j += blockDim.x){
+        float v = xr[j];
+        float m_new = fmaxf(m,v);
+        d = d * expf(m - m_new) + expf(v - m_new);
+        m = m_new;
+    }
+
+    warp_reduce_md(m, d);
+    if(lane == 0){
+        sm[warp] = m;
+        sd[warp] = d;
+    }
+    __syncthreads();
+    if(warp == 0){
+        m = (lane < 8) ? sm[lane] : -INFINITY;
+        d = (lane < 8) ? sd[lane] : 0.0f;
+        warp_reduce_md(m, d);
+        if (lane == 0) { sm[0] = m; sd[0] = d; }
+    }
+     __syncthreads();
+    m = sm[0];
+    d = sd[0];
+    for (int j = tid; j < cols; j += blockDim.x) yr[j] = expf(xr[j] - m) / d;
+
+
+
+}
+
+
 void launch(int v,const float* d_x,float* d_y,int rows,int cols){
     switch(v){
         case 1: {
@@ -160,6 +216,10 @@ void launch(int v,const float* d_x,float* d_y,int rows,int cols){
         }
          case 3: {
             softmax_v3<<<rows, 256>>>(d_x, d_y, rows, cols);
+            break;
+        }
+        case 4: {
+            softmax_v4<<<rows, 256>>>(d_x, d_y, rows, cols);
             break;
         }
        default: std::cout << "Unknown version " << v << std::endl; exit(1);
@@ -185,7 +245,7 @@ int main(){
     CUDA_CHECK(cudaEventCreate(&start));
     CUDA_CHECK(cudaEventCreate(&stop));
 
-    for (int v = 1; v <= 3; v++) {
+    for (int v = 1; v <= 4; v++) {
         CUDA_CHECK(cudaMemset(d_y, 0, bytes));
         launch(v, d_x, d_y, ROWS, COLS);
         CUDA_CHECK(cudaGetLastError());
