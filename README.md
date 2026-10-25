@@ -3,7 +3,7 @@
 The memory-bound kernels used inside transformers, written from scratch in CUDA
 on an NVIDIA Tesla T4 and measured in GB/s against the T4's memory bandwidth
 (320 GB/s spec, ~250 GB/s achievable in practice). Every version is checked for
-correctness against a CPU reference.
+correctness against a CPU reference, and the final kernels are callable from PyTorch.
 
 Why GB/s and not GFLOPS: these kernels do only a few operations per number while
 reading and writing every number (arithmetic intensity ~0.5 to 3 FLOPs/byte, far below
@@ -81,12 +81,34 @@ What I learned:
 - **`rsqrtf`** computes 1/sqrt in one instruction, so each output is a multiplication
   instead of a division.
 
+## 4. Calling the kernels from PyTorch
+
+`python/torch_ext.py` compiles softmax v3 and RMSNorm as a PyTorch extension
+(`torch.utils.cpp_extension.load_inline`): a C++ wrapper validates the tensors
+(device, dtype, shape, contiguity), allocates the output, and launches the kernel on
+the tensors' raw GPU pointers. Outputs match PyTorch to within ~1e-6.
+
+| Kernel | Mine | PyTorch | Notes |
+| --- | --- | --- | --- |
+| Softmax | ~160 GB/s | `torch.softmax`: ~217 GB/s | |
+| RMSNorm | ~185 GB/s | plain PyTorch ops: ~65 GB/s | **2.9x faster: fusion** |
+| RMSNorm | ~185 GB/s | `F.rms_norm`: ~234 GB/s | PyTorch's own fused kernel |
+
+What I learned:
+- **Kernel fusion:** written as separate PyTorch operations, RMSNorm runs as several
+  kernels that each read and write full tensors in memory (~6 trips of 16 MB). One
+  fused kernel reads the input once and writes the output once: 2.9x faster.
+- **The gap to PyTorch's best kernels** comes from two things mine don't do yet: loading
+  each row into registers once (mine reads each row two or three times) and wider
+  vectorized memory loads.
+
 ## Build and run
 
     make
     ./bin/reduction
     ./bin/softmax
     ./bin/norms
+    python python/torch_ext.py
 
-Requires the CUDA toolkit and an NVIDIA GPU. Set `-arch` in the Makefile for your GPU
-(`sm_75` for a T4).
+Requires the CUDA toolkit, PyTorch with CUDA, and an NVIDIA GPU. Set `-arch` in the
+Makefile for your GPU (`sm_75` for a T4).
