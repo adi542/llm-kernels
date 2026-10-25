@@ -5,6 +5,11 @@ on an NVIDIA Tesla T4 and measured in GB/s against the T4's memory bandwidth
 (320 GB/s spec, ~250 GB/s achievable in practice). Every version is checked for
 correctness against a CPU reference.
 
+Why GB/s and not GFLOPS: these kernels do only a few operations per number while
+reading and writing every number (arithmetic intensity ~0.5 to 3 FLOPs/byte, far below
+the T4's ridge point of ~18 to 25). They are limited by memory, not math, so they are
+measured against the memory limit.
+
 ## 1. Parallel reduction (sum)
 
 N = 16,777,216 floats (64 MB), 256 threads per block. Checked against a CPU sum in
@@ -57,11 +62,31 @@ What I learned:
 - **Testing lesson:** my first checker reported NaN outputs as "correct" (every
   comparison with NaN is false). It now checks for NaN explicitly.
 
+## 3. RMSNorm and LayerNorm
+
+4096 rows x 1024 columns, FP32, one block per row, warp-shuffle block reductions
+(shared in `reduce.cuh`). Checked against double-precision CPU references.
+
+| Kernel | Reductions per row | Passes over each row | GB/s |
+| --- | --- | --- | --- |
+| RMSNorm (Llama-style) | 1 (sum of squares) | 2 | ~196 |
+| LayerNorm (GPT-2-style) | 2 (mean, then variance) | 3 | ~164 |
+
+What I learned:
+- **RMSNorm is ~16% faster than LayerNorm** in the same run: one fewer reduction and one
+  fewer pass. That cost difference is part of why modern LLMs switched to RMSNorm.
+- **LayerNorm's variance uses two passes** (mean first, then squared distances from the
+  mean) instead of the one-pass shortcut E[x^2] - mean^2, which loses precision through
+  catastrophic cancellation.
+- **`rsqrtf`** computes 1/sqrt in one instruction, so each output is a multiplication
+  instead of a division.
+
 ## Build and run
 
     make
     ./bin/reduction
     ./bin/softmax
+    ./bin/norms
 
 Requires the CUDA toolkit and an NVIDIA GPU. Set `-arch` in the Makefile for your GPU
 (`sm_75` for a T4).
