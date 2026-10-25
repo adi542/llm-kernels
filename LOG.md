@@ -9,3 +9,4 @@ Softmax v3 (warp shuffles, 4 barriers/row instead of ~18): 0.195 ms, 172.0 GB/s 
 Softmax v4 (online softmax, 2 passes): 146.7 GB/s vs v3 175.7 in the same run. Slower standalone: rows fit in cache so the saved pass was cheap, and the update adds 2 exps + a dependency chain per element. Its value is enabling fusion (Flash Attention). Also fixed the checker: NaN used to pass as 'correct'.
 RMSNorm (one block per row, 1 block reduction, rsqrtf): 4096x1024, 0.172 ms, 194.6 GB/s (61%). Faster than softmax v3: 1 reduction, no exps.
 LayerNorm (one block per row, 2 reductions: mean then variance, 3 passes): 0.204 ms, 164.4 GB/s (51%). ~16% slower than RMSNorm (195.8 GB/s, same run): extra reduction + extra pass.
+PyTorch extension (load_inline): softmax v3 160 GB/s vs torch.softmax 217. RMSNorm 185 GB/s vs plain PyTorch 65 (2.9x, fusion) vs F.rms_norm 234. Gap to PyTorch's fused kernels: they read each row once (registers) + wider loads.
