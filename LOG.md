@@ -8,3 +8,4 @@ Softmax v2 (one block per row, shared memory trees): 0.256 ms, 131.0 GB/s (41%).
 Softmax v3 (warp shuffles, 4 barriers/row instead of ~18): 0.195 ms, 172.0 GB/s (54%). +29% over v2: trees matter with short rows.
 Softmax v4 (online softmax, 2 passes): 146.7 GB/s vs v3 175.7 in the same run. Slower standalone: rows fit in cache so the saved pass was cheap, and the update adds 2 exps + a dependency chain per element. Its value is enabling fusion (Flash Attention). Also fixed the checker: NaN used to pass as 'correct'.
 RMSNorm (one block per row, 1 block reduction, rsqrtf): 4096x1024, 0.172 ms, 194.6 GB/s (61%). Faster than softmax v3: 1 reduction, no exps.
+LayerNorm (one block per row, 2 reductions: mean then variance, 3 passes): 0.204 ms, 164.4 GB/s (51%). ~16% slower than RMSNorm (195.8 GB/s, same run): extra reduction + extra pass.
