@@ -20,6 +20,7 @@ def softmax(x):
     BLOCK = triton.next_power_of_2(cols)
     softmax_kernel[(rows,)](x, y, cols, BLOCK_SIZE=BLOCK)
     return y
+    
 
 def time_ms(fn, runs=50):
     for _ in range(5):

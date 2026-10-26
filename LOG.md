@@ -12,3 +12,4 @@ LayerNorm (one block per row, 2 reductions: mean then variance, 3 passes): 0.204
 PyTorch extension (load_inline): softmax v3 160 GB/s vs torch.softmax 217. RMSNorm 185 GB/s vs plain PyTorch 65 (2.9x, fusion) vs F.rms_norm 234. Gap to PyTorch's fused kernels: they read each row once (registers) + wider loads.
 Triton vector add: 244.7 GB/s vs torch 245.2 (same run), CUDA ~248 earlier. ~10 lines of Python reach the memory limit.
 Triton fused softmax (one program per row, row loaded once): 232.2 GB/s vs torch 215.6 vs CUDA v3 139.7 (same run). ~93% of practical limit.
+Triton RMSNorm (row loaded once): 233.7 GB/s = F.rms_norm 233.6, CUDA 173.1 (same run). Among fused kernels, reading the row once is the difference.
