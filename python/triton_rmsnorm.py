@@ -24,32 +24,33 @@ def rmsnorm(x, w, eps):
     rmsnorm_kernel[(rows,)](x, y, cols, w, eps, BLOCK_SIZE=BLOCK)
     return y
     
-
-def time_ms(fn, runs=50):
-    for _ in range(5):
-        fn()
-    torch.cuda.synchronize()
-    start = torch.cuda.Event(enable_timing=True)
-    end   = torch.cuda.Event(enable_timing=True)
-    start.record()
-    for _ in range(runs):
-        fn()
-    end.record()
-    torch.cuda.synchronize()
-    return start.elapsed_time(end) / runs
-
-# ---------- test
-eps = 1e-5
-x = torch.randn(4096, 1024, device="cuda")
-w = torch.rand(1024, device="cuda") + 0.5
-y_triton = rmsnorm(x, w, eps)
-y_ref    = torch.nn.functional.rms_norm(x, (1024,), w, eps)
-print("max difference:", (y_triton - y_ref).abs().max().item())
-
-# ---------- race
-bytes_moved = 2 * x.numel() * 4
-for name, fn in [("triton    ", lambda: rmsnorm(x, w, eps)),
-                 ("CUDA      ", lambda: ext.rms_norm(x, w, eps)),
-                 ("F.rms_norm", lambda: torch.nn.functional.rms_norm(x, (1024,), w, eps))]:
-    ms = time_ms(fn)
-    print(name, round(ms, 3), "ms", round(bytes_moved / (ms / 1000) / 1e9, 1), "GB/s")
+if __name__ == "__main__":
+    
+    def time_ms(fn, runs=50):
+        for _ in range(5):
+            fn()
+        torch.cuda.synchronize()
+        start = torch.cuda.Event(enable_timing=True)
+        end   = torch.cuda.Event(enable_timing=True)
+        start.record()
+        for _ in range(runs):
+            fn()
+        end.record()
+        torch.cuda.synchronize()
+        return start.elapsed_time(end) / runs
+    
+    # ---------- test
+    eps = 1e-5
+    x = torch.randn(4096, 1024, device="cuda")
+    w = torch.rand(1024, device="cuda") + 0.5
+    y_triton = rmsnorm(x, w, eps)
+    y_ref    = torch.nn.functional.rms_norm(x, (1024,), w, eps)
+    print("max difference:", (y_triton - y_ref).abs().max().item())
+    
+    # ---------- race
+    bytes_moved = 2 * x.numel() * 4
+    for name, fn in [("triton    ", lambda: rmsnorm(x, w, eps)),
+                     ("CUDA      ", lambda: ext.rms_norm(x, w, eps)),
+                     ("F.rms_norm", lambda: torch.nn.functional.rms_norm(x, (1024,), w, eps))]:
+        ms = time_ms(fn)
+        print(name, round(ms, 3), "ms", round(bytes_moved / (ms / 1000) / 1e9, 1), "GB/s")
