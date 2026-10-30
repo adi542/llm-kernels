@@ -16,3 +16,4 @@ Triton RMSNorm (row loaded once): 233.7 GB/s = F.rms_norm 233.6, CUDA 173.1 (sam
 Triton LayerNorm (row loaded once, tl.where for padded positions): 228.4 GB/s vs F.layer_norm 170.3 (same run). Correct on 1024 and 1000 columns.
 Fused add + RMSNorm (Triton, stores h and y): 0.287 ms vs 0.351 for add + RMSNorm separately (same run). 1.22x faster, matches the 5->4 memory-trip prediction. 234 GB/s effective.
 Triton matmul FP32 4096: correct (identical to cuBLAS, 1e-6 rel vs double). Tile sweep: 32x32 1786 -> 128x128x32 8 warps 4103 GFLOPS vs cuBLAS 3976 (same run). Best = 64 outputs/thread, same as CUDA kernel 4/5.
+Triton matmul autotuned (6 configs, key M,N,K): picked 128x128x32, 8 warps, 2 stages (2 x 32 KB = T4's 64 KB smem). 4128 vs cuBLAS 4388 GFLOPS = 94% (same run). Across runs: 94-103%.
