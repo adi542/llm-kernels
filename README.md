@@ -1,4 +1,4 @@
-# LLM kernels in CUDA
+# LLM kernels in CUDA and Triton
 
 The memory-bound kernels used inside transformers, written from scratch in CUDA
 on an NVIDIA Tesla T4 and measured in GB/s against the T4's memory bandwidth
@@ -102,6 +102,55 @@ What I learned:
   each row into registers once (mine reads each row two or three times) and wider
   vectorized memory loads.
 
+## 5. Triton
+
+The same kernels rewritten in Triton (`python/triton_*.py`), FP32 on a T4, raced in the
+same run against PyTorch and my CUDA versions.
+
+### Memory-bound kernels (4096 x 1024, FP32)
+
+| Kernel | My Triton | PyTorch | My CUDA |
+| --- | --- | --- | --- |
+| Softmax (row loaded once) | ~232 GB/s | `torch.softmax` ~216 | ~140 |
+| RMSNorm | ~234 GB/s | `F.rms_norm` ~234 | ~173 |
+| LayerNorm | ~228 GB/s | `F.layer_norm` ~170 | ~164 |
+| Fused residual add + RMSNorm | 0.287 ms | add + `F.rms_norm`: 0.352 ms | - |
+
+### Matmul (4096 x 4096, FP32)
+
+| Version | GFLOPS | vs cuBLAS (same run) |
+| --- | --- | --- |
+| 64 x 64 tiles | ~2,900 | 73% |
+| 128 x 128 x 32 tiles, 8 warps (hand-picked) | ~4,100 | ~100% |
+| Autotuned over 6 configs | ~4,130 | 94% |
+| Autotuned + grouped ordering (GROUP_M = 8) | ~4,560 | 110% |
+
+Across runs, the final version lands at roughly 94-110% of cuBLAS: the T4's clock varies
+with temperature, so only same-run comparisons are meaningful.
+
+### torch.compile
+
+RMSNorm: plain PyTorch ~64 GB/s, `torch.compile` ~224, my Triton ~235. The generated
+kernel (`triton_per_fused_add_mean_mul_pow_rsqrt_0`) fuses all five operations into one
+persistent-reduction kernel that loads each row once: the same design as mine.
+
+What I learned:
+- **Loading each row once** is what separates the fastest kernels: my CUDA versions read
+  each row 2-3 times, my Triton versions and PyTorch's best kernels read it once.
+- **Padding must stay harmless after every step:** in LayerNorm, padded zeros become
+  -mean after centering, so they are zeroed with `tl.where`. Tested on 1000-column rows.
+- **Fusion can be predicted by counting memory trips:** add + RMSNorm goes from 5 trips
+  to 4, predicting a 20-25% gain; measured 22%.
+- **Matmul tile choice spans 2.3x:** the best is 128 x 128 tiles with 64 outputs per
+  thread, the same configuration as my CUDA kernels 4-5. Autotuning finds it
+  automatically; grouped ordering adds 12% from L2 cache reuse alone.
+- **`torch.compile` gets within ~5% for fusable patterns.** Hand-written kernels matter
+  when the algorithm must change (Flash Attention), for the last few percent, or for
+  unusual data formats.
+- **Tooling limit:** Triton dropped Turing (sm_75) support after version 3.2. FP16
+  `tl.dot` on the T4 is correct but runs at 0.1 TFLOPS (no tensor cores), while cuBLAS
+  FP16 reaches 24 TFLOPS. FP16 Triton benchmarks need an Ampere or newer GPU.
+
 ## Build and run
 
     make
@@ -109,6 +158,8 @@ What I learned:
     ./bin/softmax
     ./bin/norms
     python python/torch_ext.py
+    python python/triton_softmax.py     # and the other python/triton_*.py files
+    python python/compile_demo.py
 
 Requires the CUDA toolkit, PyTorch with CUDA, and an NVIDIA GPU. Set `-arch` in the
 Makefile for your GPU (`sm_75` for a T4).
