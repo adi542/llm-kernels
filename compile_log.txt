@@ -1,0 +1,162 @@
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] Output code: 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] # AOT ID: ['0_inference']
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from ctypes import c_void_p, c_long, c_int
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import torch
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import math
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import random
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import os
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import tempfile
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from math import inf, nan
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from cmath import nanj
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.hooks import run_intermediate_hooks
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.utils import maybe_profile
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.codegen.memory_planning import _align as align
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch import device, empty_strided
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.async_compile import AsyncCompile
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.select_algorithm import extern_kernels
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import triton
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import triton.language as tl
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.runtime.triton_heuristics import start_graph, end_graph
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._C import _cuda_getCurrentRawStream as get_raw_stream
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] aten = torch.ops.aten
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] inductor_ops = torch.ops.inductor
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] _quantized = torch.ops._quantized
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] assert_size_stride = torch._C._dynamo.guards.assert_size_stride
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] assert_alignment = torch._C._dynamo.guards.assert_alignment
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] empty_strided_cpu = torch._C._dynamo.guards._empty_strided_cpu
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] empty_strided_cpu_pinned = torch._C._dynamo.guards._empty_strided_cpu_pinned
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] empty_strided_cuda = torch._C._dynamo.guards._empty_strided_cuda
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] empty_strided_xpu = torch._C._dynamo.guards._empty_strided_xpu
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] empty_strided_mtia = torch._C._dynamo.guards._empty_strided_mtia
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] reinterpret_tensor = torch._C._dynamo.guards._reinterpret_tensor
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] alloc_from_pool = torch.ops.inductor._alloc_from_pool
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] async_compile = AsyncCompile()
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] empty_strided_p2p = torch._C._distributed_c10d._SymmetricMemory.empty_strided_p2p
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] # kernel path: /tmp/torchinductor_root/7u/c7u3x2ltcoocqkj4gf33uryrsev4fnu2o4la6g6wcf3gleyzjncy.py
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] # Topologically Sorted Source Nodes: [pow_1, mean, add, rsqrt, mul, mul_1], Original ATen: [aten.pow, aten.mean, aten.add, aten.rsqrt, aten.mul]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] # Source node to ATen node mapping:
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   add => add
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   mean => mean
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   mul => mul
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   mul_1 => mul_1
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   pow_1 => pow_1
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   rsqrt => rsqrt
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] # Graph fragment:
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %arg0_1 : Tensor "f32[4096, 1024][1024, 1]cuda:0" = PlaceHolder[target=arg0_1]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %buf0 : Tensor "f32[4096, 1][1, 4096]cuda:0" = PlaceHolder[target=buf0]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %arg1_1 : Tensor "f32[1024][1]cuda:0" = PlaceHolder[target=arg1_1]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %pow_1 : Tensor "f32[4096, 1024][1024, 1]cuda:0"[num_users=1] = call_function[target=torch.ops.aten.pow.Tensor_Scalar](args = (%arg0_1, 2), kwargs = {})
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %mean : Tensor "f32[4096, 1][1, 1]cuda:0"[num_users=1] = call_function[target=torch.ops.aten.mean.dim](args = (%pow_1, [1], True), kwargs = {})
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %add : Tensor "f32[4096, 1][1, 1]cuda:0"[num_users=1] = call_function[target=torch.ops.aten.add.Tensor](args = (%mean, 1e-05), kwargs = {})
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %rsqrt : Tensor "f32[4096, 1][1, 1]cuda:0"[num_users=1] = call_function[target=torch.ops.aten.rsqrt.default](args = (%add,), kwargs = {})
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %mul : Tensor "f32[4096, 1024][1024, 1]cuda:0"[num_users=1] = call_function[target=torch.ops.aten.mul.Tensor](args = (%arg0_1, %rsqrt), kwargs = {})
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   %mul_1 : Tensor "f32[4096, 1024][1024, 1]cuda:0"[num_users=1] = call_function[target=torch.ops.aten.mul.Tensor](args = (%mul, %arg1_1), kwargs = {})
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] #   return %buf0,%mul_1
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] triton_per_fused_add_mean_mul_pow_rsqrt_0 = async_compile.triton('triton_per_fused_add_mean_mul_pow_rsqrt_0', '''
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import triton
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] import triton.language as tl
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.runtime import triton_helpers, triton_heuristics
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.runtime.triton_helpers import libdevice, math as tl_math
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] from torch._inductor.runtime.hints import AutotuneHint, ReductionHint, TileHint, DeviceProperties
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] triton_helpers.set_driver_to_gpu()
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] @triton_heuristics.persistent_reduction(
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     size_hints={'x': 4096, 'r0_': 1024},
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     reduction_hint=ReductionHint.INNER,
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     filename=__file__,
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     triton_meta={'signature': {'in_ptr0': '*fp32', 'in_ptr1': '*fp32', 'out_ptr1': '*fp32', 'xnumel': 'i32', 'r0_numel': 'i32', 'XBLOCK': 'constexpr'}, 'device': DeviceProperties(type='cuda', index=0, multi_processor_count=40, cc=75, major=7, regs_per_multiprocessor=65536, max_threads_per_multi_processor=1024, max_threads_per_block=1024, warp_size=32), 'constants': {}, 'native_matmul': False, 'enable_fp_fusion': True, 'launch_pdl': False, 'disable_ftz': False, 'configs': [{(0,): [['tt.divisibility', 16]], (1,): [['tt.divisibility', 16]], (2,): [['tt.divisibility', 16]], (3,): [['tt.divisibility', 16]], (4,): [['tt.divisibility', 16]]}]},
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     inductor_meta={'grid_type': 'Grid1D', 'autotune_hints': set(), 'kernel_name': 'triton_per_fused_add_mean_mul_pow_rsqrt_0', 'mutated_arg_names': [], 'optimize_mem': True, 'no_x_dim': None, 'atomic_add_found': False, 'num_load': 2, 'num_store': 1, 'num_reduction': 1, 'backend_hash': 'FB2E6310E26133C9AE28CC0FC9EE648BE9DDD3CB5A41D621A5596599DF7EF1F5', 'assert_indirect_indexing': True, 'autotune_local_cache': True, 'autotune_pointwise': True, 'autotune_remote_cache': None, 'force_disable_caches': False, 'dynamic_scale_rblock': True, 'max_autotune': False, 'max_autotune_pointwise': False, 'min_split_scan_rblock': 256, 'spill_threshold': 16, 'store_cubin': False, 'deterministic': False, 'force_filter_reduction_configs': False, 'mix_order_reduction_allow_multi_stages': False, 'are_deterministic_algorithms_enabled': False, 'tiling_scores': {'x': 0, 'r0_': 50335744}}
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] )
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] @triton.jit
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] def triton_per_fused_add_mean_mul_pow_rsqrt_0(in_ptr0, in_ptr1, out_ptr1, xnumel, r0_numel, XBLOCK : tl.constexpr):
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     xnumel = 4096
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     r0_numel = 1024
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     R0_BLOCK: tl.constexpr = 1024
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     rnumel = r0_numel
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     RBLOCK: tl.constexpr = R0_BLOCK
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     xoffset = tl.program_id(0) * XBLOCK
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     xindex = xoffset + tl.arange(0, XBLOCK)[:, None]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     xmask = tl.full([XBLOCK], True, tl.int1)[:, None]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     r0_index = tl.arange(0, R0_BLOCK)[None, :]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     r0_offset = 0
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     r0_mask = tl.full([R0_BLOCK], True, tl.int1)[None, :]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     roffset = r0_offset
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     rindex = r0_index
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     r0_1 = r0_index
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     x0 = xindex
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp0 = tl.load(in_ptr0 + (r0_1 + 1024*x0), None)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp11 = tl.load(in_ptr1 + (r0_1), None, eviction_policy='evict_last')
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp1 = tmp0 * tmp0
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp2 = tl.broadcast_to(tmp1, [XBLOCK, R0_BLOCK])
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp4 = tl.sum(tmp2, 1)[:, None].to(tl.float32)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp5 = tl.full([1, 1], 1024.0, tl.float32)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp6 = (tmp4 / tmp5)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp7 = tl.full([1, 1], 1e-05, tl.float32)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp8 = tmp6 + tmp7
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp9 = libdevice.rsqrt(tmp8)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp10 = tmp0 * tmp9
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tmp12 = tmp10 * tmp11
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     tl.store(out_ptr1 + (r0_1 + 1024*x0), tmp12, None)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] ''', device_str='cuda')
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] async_compile.wait(globals())
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] del async_compile
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] class Runner:
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     def __init__(self, partitions):
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         self.partitions = partitions
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     def recursively_apply_fns(self, fns):
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         new_callables = []
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         for fn, c in zip(fns, self.partitions):
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             new_callables.append(fn(c))
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         self.partitions = new_callables
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     def call(self, args):
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         arg0_1, arg1_1 = args
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         args.clear()
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         assert_size_stride(arg0_1, (4096, 1024), (1024, 1))
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         assert_size_stride(arg1_1, (1024, ), (1, ))
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         with torch.cuda._DeviceGuard(0):
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             torch.cuda.set_device(0)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             buf1 = empty_strided_cuda((4096, 1024), (1024, 1), torch.float32)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             # Topologically Sorted Source Nodes: [pow_1, mean, add, rsqrt, mul, mul_1], Original ATen: [aten.pow, aten.mean, aten.add, aten.rsqrt, aten.mul]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             stream0 = get_raw_stream(0)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             triton_per_fused_add_mean_mul_pow_rsqrt_0.run(arg0_1, arg1_1, buf1, 4096, 1024, stream=stream0)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             del arg0_1
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]             del arg1_1
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]         return (buf1, )
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] runner = Runner(partitions=[])
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] call = runner.call
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] recursively_apply_fns = runner.recursively_apply_fns
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] def get_args():
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     from torch._dynamo.testing import rand_strided
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     arg0_1 = rand_strided((4096, 1024), (1024, 1), device='cuda:0', dtype=torch.float32)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     arg1_1 = rand_strided((1024, ), (1, ), device='cuda:0', dtype=torch.float32)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     return [arg0_1, arg1_1]
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] def benchmark_compiled_module(args, times=10, repeat=10):
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     from torch._inductor.utils import print_performance
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     fn = lambda: call(list(args))
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     return print_performance(fn, times=times, repeat=repeat)
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] if __name__ == "__main__":
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     from torch._inductor.wrapper_benchmark import compiled_module_main
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     args = get_args()
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code]     compiled_module_main('None', lambda times, repeat: benchmark_compiled_module(args, times=times, repeat=repeat))
+V1109 07:15:37.012000 206 torch/_inductor/codecache.py:1347] [0/0] [__output_code] 
+V1109 07:15:37.013000 206 torch/_inductor/codecache.py:1348] [0/0] [__output_code] Output code written to: /tmp/torchinductor_root/ph/cphjpeu2jftiwxjvgg6w4p3qzquhldmo2j5vyghihflb7med756a.py
+compiled max diff: 9.5367431640625e-07
+plain PyTorch    0.528 ms 63.6 GB/s
+torch.compile    0.149 ms 224.6 GB/s
+your Triton      0.144 ms 233.3 GB/s

@@ -19,3 +19,4 @@ Triton matmul FP32 4096: correct (identical to cuBLAS, 1e-6 rel vs double). Tile
 Triton matmul autotuned (6 configs, key M,N,K): picked 128x128x32, 8 warps, 2 stages (2 x 32 KB = T4's 64 KB smem). 4128 vs cuBLAS 4388 GFLOPS = 94% (same run). Across runs: 94-103%.
 Triton matmul grouped ordering (GROUP_M=8, 1D grid): 4559 vs plain 4070 vs cuBLAS 4154 GFLOPS (same run). +12% from program order alone (L2 reuse). Autotuner chose num_stages=3 this time.
 FP16 Triton matmul on T4: correct (rel err 6e-4) but 0.1 TFLOPS. Triton dropped Turing (sm_75) support after 3.2, so no tensor-core codegen. cuBLAS FP16: 24 TFLOPS (6.9x its FP32). Plan: FP16 Triton benchmarks on a rented Ampere+ GPU.
+torch.compile RMSNorm: 224 GB/s vs plain 63.7 vs my Triton 234.7 (same run). Generated kernel: triton_per_fused_add_mean_mul_pow_rsqrt_0, one persistent-reduction kernel, row loaded once: same design as mine. Shapes baked in, masks removed, evict_last on weights.
