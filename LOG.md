@@ -21,3 +21,4 @@ Triton matmul grouped ordering (GROUP_M=8, 1D grid): 4559 vs plain 4070 vs cuBLA
 FP16 Triton matmul on T4: correct (rel err 6e-4) but 0.1 TFLOPS. Triton dropped Turing (sm_75) support after 3.2, so no tensor-core codegen. cuBLAS FP16: 24 TFLOPS (6.9x its FP32). Plan: FP16 Triton benchmarks on a rented Ampere+ GPU.
 torch.compile RMSNorm: 224 GB/s vs plain 63.7 vs my Triton 234.7 (same run). Generated kernel: triton_per_fused_add_mean_mul_pow_rsqrt_0, one persistent-reduction kernel, row loaded once: same design as mine. Shapes baked in, masks removed, evict_last on weights.
 GPT-2 124M forward, 8x1024 tokens, FP32 on T4: 528 ms GPU. Matmuls 83% (volta_sgemm), attention 12% (fmha mem-efficient), GELU+adds+LayerNorm ~4%. LayerNorm only 1%: swapping my kernel would save ~0.3% (Amdahl).
+GPT-2 FP16 vs FP32 (8x1024, T4): 148 vs 577 ms, 55,310 vs 14,197 tokens/s = 3.9x (Amdahl predicted ~4.7x). Logits rel err 0.004, same top-1 token 95.3% (random-token input).
