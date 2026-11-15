@@ -23,3 +23,4 @@ torch.compile RMSNorm: 224 GB/s vs plain 63.7 vs my Triton 234.7 (same run). Gen
 GPT-2 124M forward, 8x1024 tokens, FP32 on T4: 528 ms GPU. Matmuls 83% (volta_sgemm), attention 12% (fmha mem-efficient), GELU+adds+LayerNorm ~4%. LayerNorm only 1%: swapping my kernel would save ~0.3% (Amdahl).
 GPT-2 FP16 vs FP32 (8x1024, T4): 148 vs 577 ms, 55,310 vs 14,197 tokens/s = 3.9x (Amdahl predicted ~4.7x). Logits rel err 0.004, same top-1 token 95.3% (random-token input).
 Attention baseline (B=1, H=12, d=64, FP32, T4): naive memory grows x4 per doubling of N (1640 MB at N=4096: two 805 MB NxN matrices), fused SDPA grows x2 (13 MB = just the output). Fused 4.6x faster at 4096, but both times still grow ~x4: the math stays quadratic.
+Flash Attention in plain PyTorch (one head, tiles 64x64): matches naive attention with and without causal mask (~2e-7). Causal skips fully-masked K tiles: 136 of 256 tiles at N=1024. Safe from NaN because every row sees key 0 in the first tile.
