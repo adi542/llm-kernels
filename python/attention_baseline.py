@@ -29,16 +29,17 @@ def measure(fn,q,k,v,runs=50):
     torch.cuda.synchronize()
     return start.elapsed_time(end) / runs, extra_mb, out
 
-B, H, d = 1, 12, 64                                              # one sequence, GPT-2's 12 heads of 64
-print("   N    naive ms   naive MB    fused ms   fused MB   max diff")
-for N in [512, 1024, 2048, 4096]:
-    q = torch.randn(B, H, N, d, device="cuda")
-    k = torch.randn(B, H, N, d, device="cuda")
-    v = torch.randn(B, H, N, d, device="cuda")
-    ms_n, mb_n, out_n = measure(naive_attention, q, k, v)
-    ms_f, mb_f, out_f = measure(fused_attention, q, k, v)
-    diff = (out_n - out_f).abs().max().item()
-    print(f"{N:5d}   {ms_n:8.2f}   {mb_n:8.0f}   {ms_f:8.2f}   {mb_f:8.0f}   {diff:.1e}")
+if __name__ == "__main__":
+    B, H, d = 1, 12, 64                                              # one sequence, GPT-2's 12 heads of 64
+    print("   N    naive ms   naive MB    fused ms   fused MB   max diff")
+    for N in [512, 1024, 2048, 4096]:
+        q = torch.randn(B, H, N, d, device="cuda")
+        k = torch.randn(B, H, N, d, device="cuda")
+        v = torch.randn(B, H, N, d, device="cuda")
+        ms_n, mb_n, out_n = measure(naive_attention, q, k, v)
+        ms_f, mb_f, out_f = measure(fused_attention, q, k, v)
+        diff = (out_n - out_f).abs().max().item()
+        print(f"{N:5d}   {ms_n:8.2f}   {mb_n:8.0f}   {ms_f:8.2f}   {mb_f:8.0f}   {diff:.1e}")
 
 
 

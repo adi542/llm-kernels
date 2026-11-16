@@ -27,3 +27,4 @@ Flash Attention in plain PyTorch (one head, tiles 64x64): matches naive attentio
 Flash Attention Triton kernel (FP32, one head, no mask, BLOCK_Q=64, BLOCK_K=32): matches naive attention (~4e-7), N=1024 and N=1000.
 Flash Attention Triton: causal masking added (CAUSAL constexpr, loop ends at the Q tile's end, tl.where inside diagonal tiles). Correct for causal/non-causal, N=1024 and N=1000 (~4e-7).
 Flash Attention Triton: batch + heads via 2D grid (Q tile, B*H pair), pointers offset by bh*N*D. Matches SDPA for (2,12,1024,64), causal and not (~5e-7). Bug caught: forgot to offset o_ptr, all pairs stored into pair 0.
+Flash Attention benchmark (B=1, H=12, d=64, causal, FP32, T4): memory = fused SDPA exactly (13 MB at N=4096 vs naive 1640 MB). Time: 2.2x faster than naive at 4096, 46% of SDPA's speed. Untuned: next autotune, split causal loop, exp2.
