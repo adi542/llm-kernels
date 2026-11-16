@@ -8,6 +8,12 @@ from flash_torch import naive_attention
 def flash_attn_kernel(q_ptr, k_ptr, v_ptr, o_ptr, N, scale,
                       D: tl.constexpr, BLOCK_Q: tl.constexpr, BLOCK_K: tl.constexpr,CAUSAL: tl.constexpr):
     pid = tl.program_id(axis=0)
+    bh = tl.program_id(axis=1)
+    offset = bh * N * D
+    q_ptr += offset
+    k_ptr += offset
+    v_ptr += offset
+    o_ptr += offset
     rows = pid * BLOCK_Q + tl.arange(0,BLOCK_Q)
     dims = tl.arange(0,D)
     rows_ok = rows < N
@@ -46,9 +52,10 @@ def flash_attn_kernel(q_ptr, k_ptr, v_ptr, o_ptr, N, scale,
 
 def flash_attention_triton(q, k, v,causal=False, BLOCK_Q=64, BLOCK_K=32):
     assert q.is_contiguous() and k.is_contiguous() and v.is_contiguous()
-    N, D = q.shape 
+    *lead, N, D = q.shape                   
+    BH = math.prod(lead)
     o = torch.empty_like(q)
-    grid = (triton.cdiv(N, BLOCK_Q),) 
+    grid = (triton.cdiv(N, BLOCK_Q),BH) 
     flash_attn_kernel[grid](q, k, v, o, N, 1.0 / math.sqrt(D),
                             D=D, BLOCK_Q=BLOCK_Q, BLOCK_K=BLOCK_K,CAUSAL=causal)
     return o
@@ -67,7 +74,15 @@ if __name__ == "__main__":
         
         
         
-
+    import torch.nn.functional as F
+    B, H, N, D = 2, 12, 1024, 64
+    q = torch.randn(B, H, N, D, device="cuda")
+    k = torch.randn(B, H, N, D, device="cuda")
+    v = torch.randn(B, H, N, D, device="cuda")
+    for causal in [False, True]:
+        ref = F.scaled_dot_product_attention(q, k, v, is_causal=causal)
+        out = flash_attention_triton(q, k, v, causal=causal)
+        print("B, H =", B, H, " causal =", causal, "  max difference:", (out - ref).abs().max().item())
     
 
     

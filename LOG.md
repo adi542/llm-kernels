@@ -26,3 +26,4 @@ Attention baseline (B=1, H=12, d=64, FP32, T4): naive memory grows x4 per doubli
 Flash Attention in plain PyTorch (one head, tiles 64x64): matches naive attention with and without causal mask (~2e-7). Causal skips fully-masked K tiles: 136 of 256 tiles at N=1024. Safe from NaN because every row sees key 0 in the first tile.
 Flash Attention Triton kernel (FP32, one head, no mask, BLOCK_Q=64, BLOCK_K=32): matches naive attention (~4e-7), N=1024 and N=1000.
 Flash Attention Triton: causal masking added (CAUSAL constexpr, loop ends at the Q tile's end, tl.where inside diagonal tiles). Correct for causal/non-causal, N=1024 and N=1000 (~4e-7).
+Flash Attention Triton: batch + heads via 2D grid (Q tile, B*H pair), pointers offset by bh*N*D. Matches SDPA for (2,12,1024,64), causal and not (~5e-7). Bug caught: forgot to offset o_ptr, all pairs stored into pair 0.
