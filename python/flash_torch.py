@@ -2,7 +2,7 @@ import math
 import torch
 
 def naive_attention(q, k, v,causal=False):
-    d = q.shape[-1];
+    N,d = q.shape;
     s = (q @ k.T) / math.sqrt(d);
     if(causal):
         future = torch.triu(torch.ones(N, N, dtype=torch.bool, device=q.device), diagonal=1)
