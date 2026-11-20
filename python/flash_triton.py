@@ -5,50 +5,66 @@ import triton.language as tl
 from flash_torch import naive_attention
 
 @triton.jit
+def _attn_inner(acc, l, m, q, k_ptr, v_ptr, rows, dims, start, end, N, scale,
+                D: tl.constexpr, BLOCK_K: tl.constexpr,
+                CHECK_N: tl.constexpr, CAUSAL_MASK: tl.constexpr):
+    for j in range(start, end, BLOCK_K):
+        cols = j + tl.arange(0, BLOCK_K)
+        col_ok = cols < N
+        k = tl.load(k_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
+        v = tl.load(v_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
+
+        s = tl.dot(q, tl.trans(k), input_precision="ieee") * scale
+        if CHECK_N:                                                  # switch 1: keys past the end
+            s = tl.where(col_ok[None, :], s, float("-inf"))
+        if CAUSAL_MASK:                                              # switch 2: keys in the future
+            s = tl.where(cols[None, :] <= rows[:, None], s, float("-inf"))
+
+        m_new = tl.maximum(m, tl.max(s, axis=1))
+        p     = tl.exp(s - m_new[:, None])
+        alpha = tl.exp(m - m_new)
+        l     = l * alpha + tl.sum(p, axis=1)
+        acc   = acc * alpha[:, None] + tl.dot(p, v, input_precision="ieee")
+        m     = m_new
+    return acc, l, m
+
+@triton.jit
 def flash_attn_kernel(q_ptr, k_ptr, v_ptr, o_ptr, N, scale,
-                      D: tl.constexpr, BLOCK_Q: tl.constexpr, BLOCK_K: tl.constexpr,CAUSAL: tl.constexpr):
+                      D: tl.constexpr, BLOCK_Q: tl.constexpr, BLOCK_K: tl.constexpr,
+                      CAUSAL: tl.constexpr):
     pid = tl.program_id(axis=0)
-    bh = tl.program_id(axis=1)
+    bh  = tl.program_id(axis=1)
     offset = bh * N * D
     q_ptr += offset
     k_ptr += offset
     v_ptr += offset
     o_ptr += offset
-    rows = pid * BLOCK_Q + tl.arange(0,BLOCK_Q)
-    dims = tl.arange(0,D)
+
+    rows = pid * BLOCK_Q + tl.arange(0, BLOCK_Q)
+    dims = tl.arange(0, D)
     rows_ok = rows < N
+    q = tl.load(q_ptr + rows[:, None] * D + dims[None, :], mask=rows_ok[:, None], other=0.0)
 
-    q = tl.load(q_ptr + rows[:,None] * D + dims[None,:],mask=rows_ok[:,None],other=0.0)
-    m = tl.full((BLOCK_Q,),float("-inf"),dtype=tl.float32)
-    l = tl.zeros((BLOCK_Q,),dtype=tl.float32)
-    acc = tl.zeros((BLOCK_Q,D),dtype=tl.float32)
+    m   = tl.full((BLOCK_Q,), float("-inf"), dtype=tl.float32)
+    l   = tl.zeros((BLOCK_Q,), dtype=tl.float32)
+    acc = tl.zeros((BLOCK_Q, D), dtype=tl.float32)
 
+    # ---- no old loop here: the helper does the looping
     if CAUSAL:
-        hi = tl.minimum(N,(pid+1) * BLOCK_Q)
+        lo = pid * BLOCK_Q
+        hi = tl.minimum((pid + 1) * BLOCK_Q, N)
+        acc, l, m = _attn_inner(acc, l, m, q, k_ptr, v_ptr, rows, dims, 0, lo, N, scale,
+                                D, BLOCK_K, CHECK_N=False, CAUSAL_MASK=False)
+        acc, l, m = _attn_inner(acc, l, m, q, k_ptr, v_ptr, rows, dims, lo, hi, N, scale,
+                                D, BLOCK_K, CHECK_N=True, CAUSAL_MASK=True)
     else:
-        hi = N
+        acc, l, m = _attn_inner(acc, l, m, q, k_ptr, v_ptr, rows, dims, 0, N, N, scale,
+                                D, BLOCK_K, CHECK_N=True, CAUSAL_MASK=False)
 
-    for j in range(0,hi,BLOCK_K):
-        cols = j + tl.arange(0,BLOCK_K)
-        col_ok = cols < N
-        k = tl.load(k_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
-        v = tl.load(v_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
-
-        s = tl.dot(q,tl.trans(k),input_precision="ieee") * scale
-        keep = col_ok[None,:]
-        if CAUSAL:
-            keep = keep & (cols[None, :] <= rows[:, None])
-        s = tl.where(keep, s, float("-inf"))
-
-        m_new = tl.maximum(m,tl.max(s,axis=1))
-        p = tl.exp(s - m_new[:,None])
-        alpha = tl.exp(m - m_new)
-        l = l * alpha + tl.sum(p,axis=1)
-        acc = acc * alpha[:,None] + tl.dot(p, v, input_precision="ieee")
-        m = m_new
-
-    o = acc / l[:,None]
+    o = acc / l[:, None]
     tl.store(o_ptr + rows[:, None] * D + dims[None, :], o, mask=rows_ok[:, None])
+
+
 
 def flash_attention_triton(q, k, v,causal=False, BLOCK_Q=64, BLOCK_K=32):
     assert q.is_contiguous() and k.is_contiguous() and v.is_contiguous()
