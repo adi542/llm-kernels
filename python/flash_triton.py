@@ -4,29 +4,19 @@ import triton
 import triton.language as tl
 from flash_torch import naive_attention
 
-@triton.jit
-def _attn_inner(acc, l, m, q, k_ptr, v_ptr, rows, dims, start, end, N, scale,
-                D: tl.constexpr, BLOCK_K: tl.constexpr,
-                CHECK_N: tl.constexpr, CAUSAL_MASK: tl.constexpr):
-    for j in range(start, end, BLOCK_K):
-        cols = j + tl.arange(0, BLOCK_K)
-        col_ok = cols < N
-        k = tl.load(k_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
-        v = tl.load(v_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
+@triton.autotune(
+    configs=[
+        triton.Config({"BLOCK_Q": 32,  "BLOCK_K": 32}, num_warps=4, num_stages=2),
+        triton.Config({"BLOCK_Q": 64,  "BLOCK_K": 32}, num_warps=4, num_stages=2),
+        triton.Config({"BLOCK_Q": 64,  "BLOCK_K": 64}, num_warps=4, num_stages=1),
+        triton.Config({"BLOCK_Q": 128, "BLOCK_K": 32}, num_warps=4, num_stages=2),
+        triton.Config({"BLOCK_Q": 128, "BLOCK_K": 32}, num_warps=8, num_stages=2),
+        triton.Config({"BLOCK_Q": 128, "BLOCK_K": 64}, num_warps=8, num_stages=1),
+    ],
+    key=["N"],
+)
 
-        s = tl.dot(q, tl.trans(k), input_precision="ieee") * scale
-        if CHECK_N:                                                  # switch 1: keys past the end
-            s = tl.where(col_ok[None, :], s, float("-inf"))
-        if CAUSAL_MASK:                                              # switch 2: keys in the future
-            s = tl.where(cols[None, :] <= rows[:, None], s, float("-inf"))
 
-        m_new = tl.maximum(m, tl.max(s, axis=1))
-        p     = tl.exp2(s - m_new[:, None])
-        alpha = tl.exp2(m - m_new)
-        l     = l * alpha + tl.sum(p, axis=1)
-        acc   = acc * alpha[:, None] + tl.dot(p, v, input_precision="ieee")
-        m     = m_new
-    return acc, l, m
 
 @triton.jit
 def flash_attn_kernel(q_ptr, k_ptr, v_ptr, o_ptr, N, scale,
@@ -64,16 +54,40 @@ def flash_attn_kernel(q_ptr, k_ptr, v_ptr, o_ptr, N, scale,
     o = acc / l[:, None]
     tl.store(o_ptr + rows[:, None] * D + dims[None, :], o, mask=rows_ok[:, None])
 
+@triton.jit
+def _attn_inner(acc, l, m, q, k_ptr, v_ptr, rows, dims, start, end, N, scale,
+                D: tl.constexpr, BLOCK_K: tl.constexpr,
+                CHECK_N: tl.constexpr, CAUSAL_MASK: tl.constexpr):
+    for j in range(start, end, BLOCK_K):
+        cols = j + tl.arange(0, BLOCK_K)
+        col_ok = cols < N
+        k = tl.load(k_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
+        v = tl.load(v_ptr + cols[:, None] * D + dims[None, :], mask=col_ok[:, None], other=0.0)
+
+        s = tl.dot(q, tl.trans(k), input_precision="ieee") * scale
+        if CHECK_N:                                                  # switch 1: keys past the end
+            s = tl.where(col_ok[None, :], s, float("-inf"))
+        if CAUSAL_MASK:                                              # switch 2: keys in the future
+            s = tl.where(cols[None, :] <= rows[:, None], s, float("-inf"))
+
+        m_new = tl.maximum(m, tl.max(s, axis=1))
+        p     = tl.exp2(s - m_new[:, None])
+        alpha = tl.exp2(m - m_new)
+        l     = l * alpha + tl.sum(p, axis=1)
+        acc   = acc * alpha[:, None] + tl.dot(p, v, input_precision="ieee")
+        m     = m_new
+    return acc, l, m
 
 
-def flash_attention_triton(q, k, v,causal=False, BLOCK_Q=64, BLOCK_K=32):
+
+def flash_attention_triton(q, k, v, causal=False):
     assert q.is_contiguous() and k.is_contiguous() and v.is_contiguous()
-    *lead, N, D = q.shape                   
+    *lead, N, D = q.shape
     BH = math.prod(lead)
     o = torch.empty_like(q)
-    grid = (triton.cdiv(N, BLOCK_Q),BH) 
-    flash_attn_kernel[grid](q, k, v, o, N, 1.0 /math.sqrt(D) * 1.4426950408889634,
-                            D=D, BLOCK_Q=BLOCK_Q, BLOCK_K=BLOCK_K,CAUSAL=causal)
+    grid = lambda meta: (triton.cdiv(N, meta["BLOCK_Q"]), BH)
+    flash_attn_kernel[grid](q, k, v, o, N, 1.0 / math.sqrt(D) * 1.4426950408889634,
+                            D=D, CAUSAL=causal)
     return o
 
 

@@ -17,6 +17,10 @@ for N in [512, 1024, 2048, 4096]:
     v = torch.randn(B, H, N, d, device="cuda")
     row = f"{N:5d}"
     for fn in [naive_4d, fused, mine]:
+        fn(q, k, v)
+        torch.cuda.synchronize()
         ms, mb, _ = measure(fn, q, k, v)
         row += f" | {ms:8.2f} {mb:5.0f}"
     print(row)
+from flash_triton import flash_attn_kernel
+print("best config (for the last N):", flash_attn_kernel.best_config)

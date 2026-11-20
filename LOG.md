@@ -30,3 +30,4 @@ Flash Attention Triton: batch + heads via 2D grid (Q tile, B*H pair), pointers o
 Flash Attention benchmark (B=1, H=12, d=64, causal, FP32, T4): memory = fused SDPA exactly (13 MB at N=4096 vs naive 1640 MB). Time: 2.2x faster than naive at 4096, 46% of SDPA's speed. Untuned: next autotune, split causal loop, exp2.
 Flash Attention opt 1 (split causal loop: unmasked part + diagonal): correct, but 3-9% SLOWER on T4 FP32. Masking was cheap vs FP32 dots; two loops pipeline worse (diagonal loop only 2 iterations). Re-test on tensor cores (FP16).
 Flash Attention opt 2 (exp2, log2(e) folded into scale): correct, no measurable change on T4 FP32 (saves 1 multiply per score vs ~128 FMAs). Run-to-run noise ~10%.
+Flash Attention opt 3 (autotune, 6 configs): best 64x64, 4 warps, 1 stage. 1.3-1.6x faster: N=4096 14.2 ms (63% of SDPA), N=1024 1.04 ms (92%). Bench fix: warm up before measuring memory (autotuner's ~256 MB L2-flush buffer polluted the peak).
