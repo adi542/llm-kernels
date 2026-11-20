@@ -21,8 +21,8 @@ def _attn_inner(acc, l, m, q, k_ptr, v_ptr, rows, dims, start, end, N, scale,
             s = tl.where(cols[None, :] <= rows[:, None], s, float("-inf"))
 
         m_new = tl.maximum(m, tl.max(s, axis=1))
-        p     = tl.exp(s - m_new[:, None])
-        alpha = tl.exp(m - m_new)
+        p     = tl.exp2(s - m_new[:, None])
+        alpha = tl.exp2(m - m_new)
         l     = l * alpha + tl.sum(p, axis=1)
         acc   = acc * alpha[:, None] + tl.dot(p, v, input_precision="ieee")
         m     = m_new
@@ -72,7 +72,7 @@ def flash_attention_triton(q, k, v,causal=False, BLOCK_Q=64, BLOCK_K=32):
     BH = math.prod(lead)
     o = torch.empty_like(q)
     grid = (triton.cdiv(N, BLOCK_Q),BH) 
-    flash_attn_kernel[grid](q, k, v, o, N, 1.0 / math.sqrt(D),
+    flash_attn_kernel[grid](q, k, v, o, N, 1.0 /math.sqrt(D) * 1.4426950408889634,
                             D=D, BLOCK_Q=BLOCK_Q, BLOCK_K=BLOCK_K,CAUSAL=causal)
     return o
 
