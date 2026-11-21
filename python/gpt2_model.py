@@ -2,7 +2,10 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+from flash_triton import flash_attention_triton
+from attention_baseline import naive_attention as naive_attention_4d
 
+ATTENTION = "sdpa"
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
@@ -19,7 +22,12 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)   # (B, nh, T, hs)
         k = k.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
         v = v.view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
-        y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        if ATTENTION == "mine":
+            y = flash_attention_triton(q.contiguous(), k.contiguous(), v.contiguous(), causal=True)
+        elif ATTENTION == "naive":
+            y = naive_attention_4d(q, k, v)
+        else:
+            y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
         y = y.transpose(1, 2).contiguous().view(B, T, C)
         return self.c_proj(y)
 
