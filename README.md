@@ -151,6 +151,58 @@ What I learned:
   `tl.dot` on the T4 is correct but runs at 0.1 TFLOPS (no tensor cores), while cuBLAS
   FP16 reaches 24 TFLOPS. FP16 Triton benchmarks need an Ampere or newer GPU.
 
+## 6. Flash Attention (FlashAttention-2 forward pass, Triton)
+
+Written from the algorithm up: first in plain PyTorch with explicit tile loops
+(`flash_torch.py`), then as a Triton kernel (`flash_triton.py`). One program per tile
+of queries walks through all tiles of K and V, keeping a running max `m`, running sum
+`l` and un-normalized output `acc` in registers, rescaling both by
+`alpha = exp(m_old - m_new)` whenever the max grows (online softmax, extended to the
+output), and dividing by `l` once at the end. The N x N score matrix only ever exists
+as one small tile, on-chip. Supports causal masking (the loop stops at the end of the
+query tile), batch and heads (2D grid), and any sequence length (masks at the edges).
+
+**Correctness:** matches naive attention and PyTorch's `scaled_dot_product_attention`
+to ~5e-7 (FP32), causal and non-causal, N = 1024 and 1000, shape (2, 12, 1024, 64).
+
+### Benchmark (B = 1, H = 12, d = 64, causal, FP32, T4)
+
+| N | Naive | PyTorch SDPA | Mine | Mine vs naive | Mine vs SDPA |
+| --- | --- | --- | --- | --- | --- |
+| 1,024 | 3.33 ms, 105 MB | 0.96 ms, 3 MB | 1.04 ms, 3 MB | 3.2x faster | 92% of its speed |
+| 2,048 | 10.51 ms, 413 MB | 2.39 ms, 6 MB | 3.78 ms, 6 MB | 2.8x | 63% |
+| 4,096 | 41.38 ms, 1,640 MB | 8.96 ms, 13 MB | 14.20 ms, 13 MB | 2.9x | 63% |
+
+Memory matches PyTorch's fused kernel exactly (only the output), 126x less than naive
+at N = 4,096. Time still grows ~4x per doubling of N: Flash Attention removes the
+N x N **memory**, not the N x N **math**.
+
+### Three optimizations, measured
+
+| Optimization | Effect on T4 FP32 | Why |
+| --- | --- | --- |
+| Split the causal loop (mask only the diagonal tile) | 3-9% slower | masking was cheap next to the matmuls, and two loops pipeline worse |
+| `exp2` with log2(e) folded into the scale | no change | saves one multiply per score, against ~128 FMAs |
+| Autotuning (best: 64 x 64 tiles, 4 warps, 1 stage) | **1.3-1.6x faster** | changes how the matmuls run, and in FP32 they are almost all the work |
+
+Lesson: optimize what dominates. On tensor cores (FP16), where the matmuls are ~8x
+faster, the first two should start to matter, which is why FlashAttention-2 uses them.
+
+### Inside GPT-2
+
+Plugged into my GPT-2 (OpenAI weights) in place of `scaled_dot_product_attention`:
+- logits match Hugging Face's GPT-2 to 7.6e-5, like PyTorch's attention
+- generated text is **identical to PyTorch's, token for token**, over 30 steps
+  (sequence lengths 9 to 38, so every padding and masking path is exercised)
+- end to end, 8 x 1,024 tokens: SDPA ~565 ms, mine ~620 ms, naive ~775 ms.
+  Attention is ~12% of GPT-2's time, so differences in the kernel shrink end to end
+- peak memory is the same for all three at N = 1,024: the 1.65 GB of logits sets the
+  peak, above naive attention's ~1.2 GB per layer
+
+Benchmarking lessons: warm up before measuring memory (the autotuner allocates a
+~256 MB buffer), and run `gc.collect()` before measuring (autotuning left ~2 GB of
+garbage in a reference cycle, which first looked like my kernel's memory).
+
 ## Build and run
 
     make
@@ -160,6 +212,9 @@ What I learned:
     python python/torch_ext.py
     python python/triton_softmax.py     # and the other python/triton_*.py files
     python python/compile_demo.py
+    python python/flash_triton.py      # correctness
+    python python/flash_bench.py       # vs naive and SDPA
+    python python/gpt2_flash.py        # inside GPT-2
 
 Requires the CUDA toolkit, PyTorch with CUDA, and an NVIDIA GPU. Set `-arch` in the
 Makefile for your GPU (`sm_75` for a T4).
