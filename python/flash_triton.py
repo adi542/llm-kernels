@@ -19,15 +19,18 @@ from flash_torch import naive_attention
 
 
 @triton.jit
-def flash_attn_kernel(q_ptr, k_ptr, v_ptr, o_ptr, N, scale,
+def flash_attn_kernel(q_ptr, k_ptr, v_ptr, o_ptr, N, scale,HQ, HKV, GROUP,
                       D: tl.constexpr, BLOCK_Q: tl.constexpr, BLOCK_K: tl.constexpr,
                       CAUSAL: tl.constexpr):
     pid = tl.program_id(axis=0)
     bh  = tl.program_id(axis=1)
+    b = bh // HQ
+    hq = bh % HQ
+    kv_bh = b * HKV + hq // GROUP
     offset = bh * N * D
     q_ptr += offset
-    k_ptr += offset
-    v_ptr += offset
+    k_ptr += kv_bh * N * D
+    v_ptr += kv_bh * N * D
     o_ptr += offset
 
     rows = pid * BLOCK_Q + tl.arange(0, BLOCK_Q)
@@ -84,9 +87,12 @@ def flash_attention_triton(q, k, v, causal=False):
     assert q.is_contiguous() and k.is_contiguous() and v.is_contiguous()
     *lead, N, D = q.shape
     BH = math.prod(lead)
+    HQ  = q.shape[-3] if q.dim() >= 3 else 1    # query heads: Q's third-from-last size
+    HKV = k.shape[-3] if k.dim() >= 3 else 1    # KV heads: K's third-from-last size
+    assert HQ % HKV == 0
     o = torch.empty_like(q)
     grid = lambda meta: (triton.cdiv(N, meta["BLOCK_Q"]), BH)
-    flash_attn_kernel[grid](q, k, v, o, N, 1.0 / math.sqrt(D) * 1.4426950408889634,
+    flash_attn_kernel[grid](q, k, v, o, N, 1.0 / math.sqrt(D) * 1.4426950408889634,HQ, HKV, HQ // HKV,
                             D=D, CAUSAL=causal)
     return o
 
@@ -105,14 +111,15 @@ if __name__ == "__main__":
         
         
     import torch.nn.functional as F
-    B, H, N, D = 2, 12, 1024, 64
-    q = torch.randn(B, H, N, D, device="cuda")
-    k = torch.randn(B, H, N, D, device="cuda")
-    v = torch.randn(B, H, N, D, device="cuda")
+    B, HQ, HKV, N, D = 2, 8, 2, 1024, 64
+    q = torch.randn(B, HQ, N, D, device="cuda")     # 8 query heads
+    k = torch.randn(B, HKV, N, D, device="cuda")    # only 2 KV heads
+    v = torch.randn(B, HKV, N, D, device="cuda")
+    G = HQ // HKV
+    k_rep = k.repeat_interleave(G, dim=1)           # (B, 8, N, D): each KV head copied 4 times
+    v_rep = v.repeat_interleave(G, dim=1)
     for causal in [False, True]:
-        ref = F.scaled_dot_product_attention(q, k, v, is_causal=causal)
+        ref = F.scaled_dot_product_attention(q, k_rep, v_rep, is_causal=causal)
         out = flash_attention_triton(q, k, v, causal=causal)
-        print("B, H =", B, H, " causal =", causal, "  max difference:", (out - ref).abs().max().item())
-    
-
+        print("GQA 8:2  causal =", causal, "  max difference:", (out - ref).abs().max().item())
     

@@ -32,3 +32,4 @@ Flash Attention opt 1 (split causal loop: unmasked part + diagonal): correct, bu
 Flash Attention opt 2 (exp2, log2(e) folded into scale): correct, no measurable change on T4 FP32 (saves 1 multiply per score vs ~128 FMAs). Run-to-run noise ~10%.
 Flash Attention opt 3 (autotune, 6 configs): best 64x64, 4 warps, 1 stage. 1.3-1.6x faster: N=4096 14.2 ms (63% of SDPA), N=1024 1.04 ms (92%). Bench fix: warm up before measuring memory (autotuner's ~256 MB L2-flush buffer polluted the peak).
 GPT-2 with my Flash Attention (FP32, T4): logits match HF (7.6e-5, same as naive/SDPA); generated text identical to SDPA's, token for token. End-to-end 8x1024: SDPA 553 ms, mine 612 ms (-10%), naive 750 ms. Peak memory for mine/naive reads 4130 MB vs SDPA 2181: suspicious (kernel alone = 13 MB), investigate.
+Flash Attention: GQA support (Q/O offset by query head, K/V by kv_bh = b*HKV + hq//GROUP). Matches SDPA with repeat_interleave'd K/V for 8:2 heads (~2e-7), no copies made.
